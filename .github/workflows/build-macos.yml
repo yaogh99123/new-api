@@ -1,10 +1,10 @@
-name: Build new-api for macOS (Optimized)
+name: Build new-api for macOS (Final Fix)
 
 on:
-  workflow_dispatch: # 支持在 Actions 页面手动点击运行
+  workflow_dispatch:
   push:
     tags:
-      - 'v*' # 推送版本标签时自动触发
+      - 'v*'
 
 jobs:
   build:
@@ -15,61 +15,41 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. 设置 Go 环境
+      # 1. 环境准备
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
-          check-latest: true
 
-      # 2. 设置 Node.js 环境
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      # 3. 编译前端 (修复依赖冲突)
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      # 2. 前端编译（修复 Semi UI 路径报错）
       - name: Build Frontend
         run: |
           if [ -d "web" ]; then
             cd web
-            # 使用 --legacy-peer-deps 绕过 React 版本冲突
-            npm install --legacy-peer-deps
-            npm run build
+            # 使用 pnpm 并忽略依赖冲突
+            pnpm install --no-frozen-lockfile
+            
+            # 关键修复：针对 Semi UI 的 CSS 引用路径不匹配问题进行强行替换
+            # 将 ./dist/css/semi.css 替换为标准的包引用路径
+            find . -type f \( -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" -o -name "*.css" \) -exec sed -i '' 's|@douyinfe/semi-ui/dist/css/semi.css|@douyinfe/semi-ui/dist/css/semi.min.css|g' {} + || true
+            
+            pnpm build
             cd ..
           fi
 
-      # 4. 编译后端二进制文件
+      # 3. 后端编译
       - name: Build Backend
         run: |
-          # 针对 Apple Silicon
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o new-api-macos-arm64
-          # 针对 Intel Mac
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o new-api-macos-amd64
-
-      # 5. 整理文件并压缩打包 (包含配置文件)
-      - name: Package Artifacts
-        run: |
-          mkdir -p dist/arm64 dist/amd64
-          
-          # 复制二进制文件
-          cp new-api-macos-arm64 dist/arm64/new-api
-          cp new-api-macos-amd64 dist/amd64/new-api
-          
-          # 尝试复制配置文件 (如果存在)
-          cp config.example.yaml dist/arm64/ || true
-          cp config.example.yaml dist/amd64/ || true
-          cp .env.example dist/arm64/ || true
-          cp .env.example dist/amd64/ || true
-          
-          # 压缩成两个独立的包
-          cd dist/arm64 && zip -r ../../new-api-macos-arm64.zip . && cd ../..
-          cd dist/amd64 && zip -r ../../new-api-macos-amd64.zip . && cd ../..
-
-      # 6. 上传最终的 ZIP 包
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: new-api-macos-full-package
-          path: "*.zip"
-          retention-days: 7
+          # 静态编译，确保不依赖系统库
+          export CGO_ENABLED=0
+          # 编译 Apple Silicon 版本
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o new-api-macos-arm64
+          # 编译 Intel
