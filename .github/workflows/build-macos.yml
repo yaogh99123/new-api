@@ -1,14 +1,14 @@
-name: Build new-api for macOS
+name: Build new-api for macOS (Optimized)
 
 on:
-  workflow_dispatch: # 允许你在 Actions 页面手动点击按钮触发编译
+  workflow_dispatch: # 支持在 Actions 页面手动点击运行
   push:
     tags:
-      - 'v*' # 当你发布新版本标签（如 v1.0.1）时自动触发
+      - 'v*' # 推送版本标签时自动触发
 
 jobs:
   build:
-    name: Build macOS Binary
+    name: Build and Package
     runs-on: macos-latest
     
     steps:
@@ -22,35 +22,54 @@ jobs:
           go-version: '1.21'
           check-latest: true
 
-      # 2. 设置 Node.js 环境 (用于编译前端界面)
+      # 2. 设置 Node.js 环境
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      # 3. 编译前端 (new-api 的前端通常在 web 目录下)
+      # 3. 编译前端 (修复依赖冲突)
       - name: Build Frontend
         run: |
           if [ -d "web" ]; then
             cd web
-            npm install
+            # 使用 --legacy-peer-deps 绕过 React 版本冲突
+            npm install --legacy-peer-deps
             npm run build
             cd ..
           fi
 
-      # 4. 编译后端二进制文件 (针对两种 Mac 架构)
+      # 4. 编译后端二进制文件
       - name: Build Backend
         run: |
-          # 针对 Apple Silicon (M1/M2/M3/M4) 芯片
+          # 针对 Apple Silicon
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o new-api-macos-arm64
-          
-          # 针对 Intel 芯片
+          # 针对 Intel Mac
           CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o new-api-macos-amd64
 
-      # 5. 上传成品到 GitHub Actions 页面
+      # 5. 整理文件并压缩打包 (包含配置文件)
+      - name: Package Artifacts
+        run: |
+          mkdir -p dist/arm64 dist/amd64
+          
+          # 复制二进制文件
+          cp new-api-macos-arm64 dist/arm64/new-api
+          cp new-api-macos-amd64 dist/amd64/new-api
+          
+          # 尝试复制配置文件 (如果存在)
+          cp config.example.yaml dist/arm64/ || true
+          cp config.example.yaml dist/amd64/ || true
+          cp .env.example dist/arm64/ || true
+          cp .env.example dist/amd64/ || true
+          
+          # 压缩成两个独立的包
+          cd dist/arm64 && zip -r ../../new-api-macos-arm64.zip . && cd ../..
+          cd dist/amd64 && zip -r ../../new-api-macos-amd64.zip . && cd ../..
+
+      # 6. 上传最终的 ZIP 包
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: new-api-macos-binaries
-          path: new-api-macos-*
-          retention-days: 7 # 文件保留 7 天
+          name: new-api-macos-full-package
+          path: "*.zip"
+          retention-days: 7
