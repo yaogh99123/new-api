@@ -28,6 +28,9 @@ jobs:
 
       # 2. 前端编译
       - name: Build Frontend
+        env:
+          CI: ""
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           if [ -d "web" ]; then
             cd web
@@ -43,4 +46,14 @@ jobs:
           export CGO_ENABLED=0
           # 编译 Apple Silicon 版本
           GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o new-api-macos-arm64
-          # 编译 Intel
+          # 编译 Intel 版本
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o new-api-macos-amd64
+
+      # 4. 上传产物
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: new-api-macos
+          path: |
+            new-api-macos-arm64
+            new-api-macos-amd64
