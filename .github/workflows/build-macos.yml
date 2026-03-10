@@ -49,11 +49,30 @@ jobs:
           # 编译 Intel 版本
           GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o new-api-macos-amd64
 
-      # 4. 上传产物
+      # 4. 打包配置文件和二进制文件
+      - name: Package with Config Files
+        run: |
+          # 打包 Apple Silicon 版本
+          mkdir -p pkg-arm64
+          cp new-api-macos-arm64 pkg-arm64/new-api
+          cp .env.example pkg-arm64/
+          cp new-api.service pkg-arm64/
+          cp docker-compose.yml pkg-arm64/
+          zip -r new-api-macos-arm64.zip pkg-arm64/
+
+          # 打包 Intel 版本
+          mkdir -p pkg-amd64
+          cp new-api-macos-amd64 pkg-amd64/new-api
+          cp .env.example pkg-amd64/
+          cp new-api.service pkg-amd64/
+          cp docker-compose.yml pkg-amd64/
+          zip -r new-api-macos-amd64.zip pkg-amd64/
+
+      # 5. 上传产物
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: new-api-macos
           path: |
-            new-api-macos-arm64
-            new-api-macos-amd64
+            new-api-macos-arm64.zip
+            new-api-macos-amd64.zip
