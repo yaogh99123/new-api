@@ -21,21 +21,18 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: '20'
-
-      - name: Install pnpm
-        run: npm install -g pnpm
+          bun-version: latest
 
       # 2. 前端编译
       - name: Build Frontend
         run: |
           if [ -d "web" ]; then
             cd web
-            pnpm install --no-frozen-lockfile
-            pnpm build
+            bun install
+            DISABLE_ESLINT_PLUGIN='true' bun run build
             cd ..
           fi
 
