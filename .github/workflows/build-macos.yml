@@ -1,0 +1,56 @@
+name: Build new-api for macOS
+
+on:
+  workflow_dispatch: # 允许你在 Actions 页面手动点击按钮触发编译
+  push:
+    tags:
+      - 'v*' # 当你发布新版本标签（如 v1.0.1）时自动触发
+
+jobs:
+  build:
+    name: Build macOS Binary
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. 设置 Go 环境
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          check-latest: true
+
+      # 2. 设置 Node.js 环境 (用于编译前端界面)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # 3. 编译前端 (new-api 的前端通常在 web 目录下)
+      - name: Build Frontend
+        run: |
+          if [ -d "web" ]; then
+            cd web
+            npm install
+            npm run build
+            cd ..
+          fi
+
+      # 4. 编译后端二进制文件 (针对两种 Mac 架构)
+      - name: Build Backend
+        run: |
+          # 针对 Apple Silicon (M1/M2/M3/M4) 芯片
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o new-api-macos-arm64
+          
+          # 针对 Intel 芯片
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o new-api-macos-amd64
+
+      # 5. 上传成品到 GitHub Actions 页面
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: new-api-macos-binaries
+          path: new-api-macos-*
+          retention-days: 7 # 文件保留 7 天
