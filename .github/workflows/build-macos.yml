@@ -29,18 +29,12 @@ jobs:
       - name: Install pnpm
         run: npm install -g pnpm
 
-      # 2. 前端编译（修复 Semi UI 路径报错）
+      # 2. 前端编译
       - name: Build Frontend
         run: |
           if [ -d "web" ]; then
             cd web
-            # 使用 pnpm 并忽略依赖冲突
             pnpm install --no-frozen-lockfile
-            
-            # 关键修复：针对 Semi UI 的 CSS 引用路径不匹配问题进行强行替换
-            # 将 ./dist/css/semi.css 替换为标准的包引用路径
-            find . -type f \( -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" -o -name "*.css" \) -exec sed -i '' 's|@douyinfe/semi-ui/dist/css/semi.css|@douyinfe/semi-ui/dist/css/semi.min.css|g' {} + || true
-            
             pnpm build
             cd ..
           fi
